@@ -8,6 +8,7 @@ PFDA_computer_architecture/
 │
 ├── README.md                # Project overview and setup instructions
 ├── requirements.txt         # Python dependencies for the project
+├── faang.py                 # FAANG Stock Data Downloader and Plotter script
 │
 ├── rough-work/              # Experimental scripts and notebooks
 │   └── yfinance_test.py     # Example: yfinance usage test
@@ -29,6 +30,7 @@ PFDA_computer_architecture/
 ```
 - **README.md**: Explains project purpose, setup, and usage.
 - **requirements.txt**: Lists dependencies for easy setup.
+- **faang.py**: Main script to download and plot FAANG stock data.
 - **rough-work/**: Contains experimental or temporary scripts.
 - **materials/**: Stores reference files, datasets, or extra requirements.
 - **src/**: Main application code.
@@ -40,6 +42,23 @@ PFDA_computer_architecture/
 ## REFERENCES
 
 https://ranaroussi.github.io/yfinance/
+
+## Running the FAANG Stock Data Downloader
+
+The main script for downloading and plotting FAANG stock data is `faang.py`.
+
+### To run the script from the command line:
+
+```powershell
+python faang.py
+```
+
+This will:
+- Download the latest hourly data for the previous five days for the FAANG stocks (META, AAPL, AMZN, NFLX, GOOG)
+- Save the data as a CSV file in the `data/` directory
+- Generate a plot of the closing prices and save it as a PNG in the `data/` directory
+
+You can modify the script to accept command-line arguments for custom date ranges or output locations if needed.
 
 ## Appendix
 
