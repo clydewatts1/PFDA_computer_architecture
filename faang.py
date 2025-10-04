@@ -30,6 +30,15 @@ import seaborn as sns
 
 # prototype for extracting stock data
 tickers = ["META", "AAPL", "AMZN", "NFLX", "GOOG"]
+#------------------------------------------------------------------------------
+# Functions
+#------------------------------------------------------------------------------
+# Function to get stock data from yfinance
+# It will save the data to a CSV file in the specified data_path
+# It will return the data as a DataFrame
+# If start_date is None, it will default to 6 days ago
+# If end_date is None, it will default to yesterday
+#------------------------------------------------------------------------------
 def get_data(tickers = tickers,start_date=None, end_date=None,interval="1h",data_path="./data/"):
     """
     Function to get stock data from yfinance
@@ -69,8 +78,10 @@ def get_data(tickers = tickers,start_date=None, end_date=None,interval="1h",data
     # Save the data to a CSV file
     df_data.to_csv(file_name)
     return df_data
-   
-
+#------------------------------------------------------------------------------
+# Function to get the latest file from the data_path
+# It will return the file name
+# ------------------------------------------------------------------------------
 def get_the_latest_file(data_path="./data/"):
     """get_the_latest_file
 
@@ -93,7 +104,10 @@ def get_the_latest_file(data_path="./data/"):
     latest_file = max(list_of_files, key=os.path.getctime)
     logging.info(f"Latest file: {latest_file}")
     return latest_file
-
+#------------------------------------------------------------------------------
+# Function to load a CSV file into a pandas DataFrame
+# It will return the DataFrame
+# ------------------------------------------------------------------------------
 def load_file_into_dataframe(file):
     """load_file_into_dataframe
 
@@ -108,8 +122,35 @@ def load_file_into_dataframe(file):
         return None
     df = pd.read_csv(file, header=[0,1], index_col=0, parse_dates=True)
     return df
+#------------------------------------------------------------------------------
+# Function to plot the data
+# It will save the plot to a PNG file
+# ------------------------------------------------------------------------------
+def plot_data(df, png_file_path):
+    """plot_data
 
+    Args:
+        df (pd.DataFrame): The data as a pandas DataFrame.
+        png_file_path (str): The path to save the plot image.
 
+    Returns:
+        None
+    """
+    if df is None or png_file_path is None:
+        logging.error("DataFrame or PNG file path is None.")
+        return
+    plt.figure(figsize=(14, 8))
+    for ticker in tickers:
+        plt.plot(df.index, df[(ticker, 'Close')], label=ticker)
+    plt.xlabel('Date')
+    plt.ylabel('Close Price')
+    plt.title('Stock Prices Over Time')
+    plt.legend()
+    plt.savefig(png_file_path)
+    logging.info(f"Plot saved to {png_file_path}")
+#------------------------------------------------------------------------------
+# Main function to parse arguments and call other functions
+#------------------------------------------------------------------------------
 def main():
     # Get command line arguments 
     # it will use defaults to project requirements
@@ -127,33 +168,50 @@ def main():
     # setup variables from args
     start_date = args.start_date
     end_date = args.end_date
+    if end_date is None:
+        end_date = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
+        logging.info(f"End date not provided. Defaulting to yesterday: {end_date}")
+    if start_date is None:
+        start_date = (datetime.now() - timedelta(days=6)).strftime("%Y-%m-%d")
+        logging.info(f"Start date not provided. Defaulting to 6 days ago: {start_date}")
     interval = args.interval
     data_path = args.data_path
     log_level = args.log_level
-    tickers
+    tickers = args.tickers
+    log_path = args.log_path
     report_name = args.report_name
+    png_file_path = None
     # setup logging , default to INFO
     # the default will be to logs directory with the file name faang_YYYYMMDD_HHMMSS.log and to console
-    log_file = os.path.join(args.log_path, f"faang_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log")
+    log_file = os.path.join(log_path, f"faang_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log")
     logging.basicConfig(level=log_level, handlers=[
         logging.FileHandler(log_file),
         logging.StreamHandler()
     ])
-    logging
     logging.info("Logging setup complete.")
+    # Log the arguments for debugging, one per line
+    logging.info(f"start_date={start_date}")
+    logging.info(f"end_date={end_date}")
+    logging.info(f"interval={interval}")
+    logging.info(f"data_path={data_path}")
+    logging.info(f"tickers={tickers}")
+    logging.info(f"log_level={log_level}")
+    logging.info(f"log_path={log_path}")
+    logging.info(f"report_name={report_name}")
     logging.info("Starting to Extract Data from Source yfinance")
     df_data = get_data(tickers, start_date=start_date, end_date=end_date, interval=interval, data_path=data_path)
-    # TODO Extract data from yfinance
     logging.info("Extract Complete")
-    # TODO load file
     logging.info("Starting to Load File")
     latest_file = get_the_latest_file(data_path=data_path)
     df_loaded = load_file_into_dataframe(latest_file)
     logging.info("Load File Complete")
-    # TODO print report
     logging.info("Starting to Generate Report")
-    
-
+    # convert latest_file to png file name
+    if latest_file is None:
+        logging.error("No latest file found. Cannot generate report.")
+        return
+    png_file_path = latest_file.replace('.csv', '.png')
+    plot_data(df_loaded, png_file_path)
     logging.info("Report Complete")
     logging.info("Complete Main")
 
