@@ -53,8 +53,11 @@ def get_data(tickers = tickers,start_date=None, end_date=None,interval="1h",data
     df_data (DataFrame): DataFrame containing the stock data
     file_name (str): Name of the file where data is saved
     """
+    ## TODO: start with the end date , and then go back 5 trading days to get the start date , if start_date is None
+    # is not configured
     if start_date is None:
-        start_date = (datetime.now() - timedelta(days=6)).strftime("%Y-%m-%d")
+        # Variation of the fence posting to get last 7 days of data
+        start_date = (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d")
         # create file name based on current date and time
         file_name = f"{data_path}{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
     else:
@@ -63,8 +66,13 @@ def get_data(tickers = tickers,start_date=None, end_date=None,interval="1h",data
         # create file name based on start time and 23:59:59 of end date
         start_date_str = start_date_time.strftime("%Y%m%d") + "_235959"
         file_name = f"{data_path}{start_date_str}.csv"
+    # if end_date is None , set to today - 0 days this means yesterday's data inclusive
     if end_date is None:
-        end_date = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
+        end_date = (datetime.now() - timedelta(days=0)).strftime("%Y-%m-%d")
+    else: # convert end_date to datetime object
+        end_date_time = datetime.strptime(end_date, "%Y-%m-%d")
+        # add 1 day to end_date to make it inclusive
+        end_date = (end_date_time + timedelta(days=1)).strftime("%Y-%m-%d")
     # check if directory exists
     if not os.path.exists(data_path):
         logging.info(f"Creating directory: {data_path}")
