@@ -14,10 +14,11 @@ import logging
 import os
 import glob
 from datetime import datetime, timedelta
-import yfinance
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
+import numpy as np
+import yfinance as yf
 
 ## Problem 3: Script
 #
@@ -33,12 +34,8 @@ tickers = ["META", "AAPL", "AMZN", "NFLX", "GOOG"]
 #------------------------------------------------------------------------------
 # Functions
 #------------------------------------------------------------------------------
-# Function to get stock data from yfinance
-# It will save the data to a CSV file in the specified data_path
-# It will return the data as a DataFrame
-# If start_date is None, it will default to 6 days ago
-# If end_date is None, it will default to yesterday
-#------------------------------------------------------------------------------
+# prototype for extracting stock data
+tickers = ["META", "AAPL", "AMZN", "NFLX", "GOOG"]
 def get_data(tickers = tickers,start_date=None, end_date=None,interval="1h",data_path="./data/"):
     """
     Function to get stock data from yfinance
@@ -50,11 +47,13 @@ def get_data(tickers = tickers,start_date=None, end_date=None,interval="1h",data
     interval (str): Data interval. Default is "1h".
     data_path (str): Path to save the data. Default is "./data/".
     Returns:
-    df_data (DataFrame): DataFrame containing the stock data
-    file_name (str): Name of the file where data is saved
+       return_code : 0 for success, -1 for failure
+       return_message : message indicating success or failure
+       file_name (str): Name of the file where data is saved
     """
-    ## TODO: start with the end date , and then go back 5 trading days to get the start date , if start_date is None
-    # is not configured
+    return_code = 0
+    return_message = "Success"
+    file_name = None
     if start_date is None:
         # Variation of the fence posting to get last 7 days of data
         start_date = (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d")
@@ -76,42 +75,86 @@ def get_data(tickers = tickers,start_date=None, end_date=None,interval="1h",data
     # check if directory exists
     if not os.path.exists(data_path):
         logging.info(f"Creating directory: {data_path}")
-        os.makedirs(data_path)
+        try:
+            os.makedirs(data_path)
+        except Exception as e:
+            logging.error(f"Error creating directory: {e}")
+            return_code = -1
+            return_message = f"Error creating directory: {e}"
+            return return_code, return_message, None
     # if file exists then delete it
     if os.path.exists(file_name):
         logging.info(f"Deleting existing file: {file_name}")
-        os.remove(file_name)
+        try:
+            os.remove(file_name)
+        except Exception as e:
+            logging.error(f"Error deleting file: {e}")
+            return_code = -1
+            return_message = f"Error deleting file: {e}"
+            return return_code, return_message, None
     logging.info(f"Start Date: {start_date}, End Date: {end_date}")
-    df_data = yfinance.download(tickers, interval=interval, group_by='ticker',start=start_date, end=end_date)
+    try:
+        df_data = yf.download(tickers, interval=interval, group_by='ticker',start=start_date, end=end_date)
+    except Exception as e:
+        logging.error(f"Error downloading data: {e}")
+        return_code = -1
+        return_message = f"Error downloading data: {e}"
+        return return_code, return_message, None
     # Save the data to a CSV file
     df_data.to_csv(file_name)
-    return df_data
+    return return_code, return_message, file_name
+   
 #------------------------------------------------------------------------------
-# Function to get the latest file from the data_path
-# It will return the file name
-# ------------------------------------------------------------------------------
-def get_the_latest_file(data_path="./data/"):
-    """get_the_latest_file
+# Function to get the latest file from a directory
+#------------------------------------------------------------------------------
 
-    Args:
-        data_path (str): The path to the directory containing the data files.
-
-    Returns:
-        str: The path to the latest data file, or None if no files are found.
+def get_latest_file(data_path="./data/"):
     """
+    Retrieves the latest file from a specified directory based on creation time.
+    Args:
+        data_path (str): The directory path to search for files. Defaults to "./data/".
+    Returns:
+        tuple: A tuple containing:
+            - return_code (int): Status code (0 for success, -1 for failure).
+            - return_message (str): A message indicating success or the error encountered.
+            - latest_file (str or None): The path to the latest file, or None if no files are found or an error occurs.
+    Notes:
+        - The function searches for files matching the pattern "20[0-9][0-9][0-1][0-9][0-3][0-9]_[0-9][0-9][0-9][0-9][0-9][0-9].csv".
+        - The latest file is determined based on the creation time, not the date in the file name.
+        - Logs are generated to provide information, warnings, or errors during execution.
+    """
+
+ 
+    return_code = 0
+    return_message = "Success"
+    latest_file = None
 
     logging.info(f"Getting the latest file from {data_path}")
     # File pattern
     file_pattern = "20[0-9][0-9][0-1][0-9][0-3][0-9]_[0-9][0-9][0-9][0-9][0-9][0-9].csv"
     # Add path to file pattern
     file_pattern = os.path.join(data_path, file_pattern)
-    list_of_files = glob.glob(file_pattern) 
+    # glob searches directories for files based on a pattern
+    try:
+        list_of_files = glob.glob(file_pattern)
+    except Exception as e:
+        logging.error(f"Error occurred while searching for files: {e}")
+        return_code=-1
+        return_message=f"Error occurred while searching for files: {e}"
+        return return_code, return_message, None
     if not list_of_files:
         logging.warning(f"No files found in {data_path} matching pattern {file_pattern}")
-        return None
+        return_code = -1
+        return_message = f"No files found in {data_path} matching pattern {file_pattern}"
+        return return_code, return_message, None
+    # find the latest file based on creation time
+    #    max parameters - list and function which gets "value" associated with each item in the list
+    #    this gets the "youngest" file based on creation time 
+    #    not necessarily the latest date in the file name - design decision 
+    #    the premise is that the latest file created is the one we want to use
     latest_file = max(list_of_files, key=os.path.getctime)
     logging.info(f"Latest file: {latest_file}")
-    return latest_file
+    return return_code, return_message, latest_file
 #------------------------------------------------------------------------------
 # Function to load a CSV file into a pandas DataFrame
 # It will return the DataFrame
@@ -123,13 +166,42 @@ def load_file_into_dataframe(file):
         file (str): The path to the data file.
 
     Returns:
-        pd.DataFrame: The data as a pandas DataFrame.
+        tuple: (return_code, return_message, df) where:
+            return_code (int): 0 for success, -1 for failure
+            return_message (str): Success or error message
+            df (pd.DataFrame): The data as a pandas DataFrame with multi-level columns
     """
+    return_code = 0
+    return_message = "Success"
+    df = None
+    
+    # Check if file name is provided
     if file is None:
         logging.error("No file provided to load into dataframe.")
-        return None
-    df = pd.read_csv(file, header=[0,1], index_col=0, parse_dates=True)
-    return df
+        return_code = -1
+        return_message = "No file provided to load into dataframe."
+        return return_code, return_message, None
+    
+    # Check if file exists
+    if not os.path.exists(file):
+        logging.error(f"File does not exist: {file}")
+        return_code = -1
+        return_message = f"File does not exist: {file}"
+        return return_code, return_message, None
+    
+    # Load the CSV file into a DataFrame with multi-level columns
+    try:
+        df = pd.read_csv(file, header=[0,1], index_col=0, parse_dates=True)
+        logging.info(f"Successfully loaded data from {file}. Shape: {df.shape}")
+    except Exception as e:
+        logging.error(f"Error loading file {file}: {e}")
+        return_code = -1
+        return_message = f"Error loading file {file}: {e}"
+        return return_code, return_message, None
+    
+    return return_code, return_message, df
+
+
 #------------------------------------------------------------------------------
 # Function to plot the data
 # It will save the plot to a PNG file
@@ -144,9 +216,13 @@ def plot_data(df, png_file_path):
     Returns:
         None
     """
+    return_code = 0
+    return_message = "Success"
     if df is None or png_file_path is None:
         logging.error("DataFrame or PNG file path is None.")
-        return
+        return_code = -1
+        return_message = "DataFrame or PNG file path is None."
+        return return_code, return_message, None
     plt.figure(figsize=(14, 8))
     for ticker in tickers:
         plt.plot(df.index, df[(ticker, 'Close')], label=ticker)
@@ -154,8 +230,26 @@ def plot_data(df, png_file_path):
     plt.ylabel('Close Price')
     plt.title('Stock Prices Over Time')
     plt.legend()
-    plt.savefig(png_file_path)
-    logging.info(f"Plot saved to {png_file_path}")
+    plt.grid(True)
+    plt.tight_layout()
+    # Save the plot to a PNG file
+    try:
+        os.makedirs(os.path.dirname(png_file_path), exist_ok=True)
+    except Exception as e:
+        logging.error(f"Error creating directories for {png_file_path}: {e}")
+        return_code = -1
+        return_message = f"Error creating directories for {png_file_path}: {e}"
+        return return_code, return_message, None
+    logging.info(f"Saving plot to {png_file_path}")
+    try:
+        plt.savefig(png_file_path)
+    except Exception as e:
+        logging.error(f"Error saving plot to {png_file_path}: {e}")
+        return_code = -1
+        return_message = f"Error saving plot to {png_file_path}: {e}"
+        return return_code, return_message, None
+    plt.close()
+    return return_code, return_message, png_file_path
 #------------------------------------------------------------------------------
 # Main function to parse arguments and call other functions
 #------------------------------------------------------------------------------
@@ -207,19 +301,40 @@ def main():
     logging.info(f"log_path={log_path}")
     logging.info(f"report_name={report_name}")
     logging.info("Starting to Extract Data from Source yfinance")
-    df_data = get_data(tickers, start_date=start_date, end_date=end_date, interval=interval, data_path=data_path)
+    #==============================================================================
+    # EXTRACT 
+    #==============================================================================
+    return_code, return_message, file_name = get_data(tickers, start_date=start_date, end_date=end_date, interval=interval, data_path=data_path)
+    if return_code != 0:
+        logging.error(f"Data extraction failed: { return_message , return_code}")
+        exit(1)
+    logging.info(f"Data extraction complete. Data saved to {file_name}")
+    
+    
     logging.info("Extract Complete")
     logging.info("Starting to Load File")
-    latest_file = get_the_latest_file(data_path=data_path)
-    df_loaded = load_file_into_dataframe(latest_file)
+    #==============================================================================
+    # LOAD
+    #==============================================================================
+    return_code, return_message, latest_file = get_latest_file(data_path=data_path)
+    if return_code != 0:
+        logging.error(f"Failed to get latest file: { return_message , return_code}")
+        exit(2)
+    return_code, return_message, df_loaded = load_file_into_dataframe(latest_file)
+    if return_code != 0:
+        logging.error(f"Failed to load file into dataframe: { return_message , return_code}")
+        exit(3)
     logging.info("Load File Complete")
     logging.info("Starting to Generate Report")
+    #================================================================================
+    # TRANSFORM and REPORT
+    #================================================================================
     # convert latest_file to png file name
     if latest_file is None:
         logging.error("No latest file found. Cannot generate report.")
-        return
+        exit(4)
     png_file_path = latest_file.replace('.csv', '.png')
-    plot_data(df_loaded, png_file_path)
+    return_code, return_message, png_file_path = plot_data(df_loaded, png_file_path)
     logging.info("Report Complete")
     logging.info("Complete Main")
 
