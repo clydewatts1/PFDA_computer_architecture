@@ -9,13 +9,16 @@
 #==============================================================================
 # Note: This script downloads stock data for FAANG stocks and creates a plot.
 
-import argparse
+
 import logging
-import os
-import glob
 from datetime import datetime, timedelta
+import os
+import pathlib as Path
+import glob
+import argparse
 import pandas as pd
 import matplotlib.pyplot as plt
+import matplotlib.dates as mdates 
 import seaborn as sns
 import numpy as np
 import yfinance as yf
@@ -29,11 +32,6 @@ import yfinance as yf
 
 # The Developer : Clyde Watts using github copilot to assist
 
-# prototype for extracting stock data
-tickers = ["META", "AAPL", "AMZN", "NFLX", "GOOG"]
-#------------------------------------------------------------------------------
-# Functions
-#------------------------------------------------------------------------------
 # prototype for extracting stock data
 tickers = ["META", "AAPL", "AMZN", "NFLX", "GOOG"]
 def get_data(tickers = tickers,start_date=None, end_date=None,interval="1h",data_path="./data/"):
@@ -104,27 +102,21 @@ def get_data(tickers = tickers,start_date=None, end_date=None,interval="1h",data
     df_data.to_csv(file_name)
     return return_code, return_message, file_name
    
-#------------------------------------------------------------------------------
+
+  #------------------------------------------------------------------------------
 # Function to get the latest file from a directory
 #------------------------------------------------------------------------------
 
 def get_latest_file(data_path="./data/"):
     """
-    Retrieves the latest file from a specified directory based on creation time.
-    Args:
-        data_path (str): The directory path to search for files. Defaults to "./data/".
-    Returns:
-        tuple: A tuple containing:
-            - return_code (int): Status code (0 for success, -1 for failure).
-            - return_message (str): A message indicating success or the error encountered.
-            - latest_file (str or None): The path to the latest file, or None if no files are found or an error occurs.
-    Notes:
-        - The function searches for files matching the pattern "20[0-9][0-9][0-1][0-9][0-3][0-9]_[0-9][0-9][0-9][0-9][0-9][0-9].csv".
-        - The latest file is determined based on the creation time, not the date in the file name.
-        - Logs are generated to provide information, warnings, or errors during execution.
-    """
+    Returns the path to the latest data file in the specified directory.
 
- 
+    Args:
+        data_path (str): The path to the directory containing the data files.
+
+        tuple: (return_code, return_message, latest_file) where latest_file is the path to the latest data file, or None if no files are found.
+        str: The path to the latest data file, or None if no files are found.
+    """
     return_code = 0
     return_message = "Success"
     latest_file = None
@@ -155,10 +147,29 @@ def get_latest_file(data_path="./data/"):
     latest_file = max(list_of_files, key=os.path.getctime)
     logging.info(f"Latest file: {latest_file}")
     return return_code, return_message, latest_file
-#------------------------------------------------------------------------------
-# Function to load a CSV file into a pandas DataFrame
-# It will return the DataFrame
-# ------------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
+# Function to get PNG filename from CSV filename
+#-------------------------------------------------------------------------------
+def get_PNG_filename_from_CSV_filename(csv_filename,plot_path="./plots/"):
+    """
+    Function to get PNG filename from CSV filename
+
+    Parameters:
+    csv_filename (str): Name of the CSV file
+    plot_path (str): Path to save the PNG file. Default is "./plots/".
+
+    Returns:
+       png_filename (str): Name of the PNG file
+    """
+    return_code = 0
+    return_message = "Success"
+    # extract base name from csv_filename
+    base_name = os.path.basename(csv_filename)
+    # remove .csv extension
+    base_name = os.path.splitext(base_name)[0]
+    # create png filename
+    png_filename = f"{plot_path}{base_name}.png"
+    return return_code, return_message, png_filename
 def load_file_into_dataframe(file):
     """load_file_into_dataframe
 
@@ -201,12 +212,7 @@ def load_file_into_dataframe(file):
     
     return return_code, return_message, df
 
-
-#------------------------------------------------------------------------------
-# Function to plot the data
-# It will save the plot to a PNG file
-# ------------------------------------------------------------------------------
-def plot_data(df, png_file_path):
+def plot_data(show_plot=False):
     """plot_data
 
     Args:
@@ -216,40 +222,98 @@ def plot_data(df, png_file_path):
     Returns:
         None
     """
+    
     return_code = 0
     return_message = "Success"
-    if df is None or png_file_path is None:
+    png_file_name = None
+    # define date format string YYYY-MM-DD HH
+    # date_format_str = "%m-%d %H" # Removed
+    # create date formatter
+    # date_formatter = plt.matplotlib.dates.DateFormatter(date_format_str) # Removed
+    logging.info("Starting data plotting...")
+    # Get the latest file
+    return_code, return_message, png_file_name = get_latest_file()
+    if return_code != 0:
+        logging.error(f"Latest file retrieval failed - Return Code: {return_code}, Message: {return_message}")
+        return return_code, return_message, png_file_name
+    # load data into dataframe
+    return_code, return_message, df_raw = load_file_into_dataframe(png_file_name)
+    if return_code != 0:
+        logging.error(f"File load failed - Return Code: {return_code}, Message: {return_message}, File: {png_file_name}")
+        return return_code, return_message, png_file_name
+    # convert csv file name to png file name
+    return_code, return_message, png_file_name = get_PNG_filename_from_CSV_filename(png_file_name, "./plots/")
+    if return_code != 0:
+        logging.error(f"PNG file path retrieval failed - Return Code: {return_code}, Message: {return_message}, File: {png_file_path}")
+        return return_code, return_message, png_file_path
+    # Create plots directory if it doesn't exist
+    # extract path from png_file_name
+    png_path = Path.Path(png_file_name).parent 
+    try:
+        os.makedirs(png_path, exist_ok=True)
+    except Exception as e:
+        logging.error(f"Failed to create directory {png_path} - {e}")
+        return 1, f"Failed to create directory {png_path}", None
+    # copy dataframe to avoid modifying original
+    df = df_raw.copy()
+    # Convert index to EST timezone and extract date - NASDAQ data is in EST
+    df['Datetime_EST'] = df.index.tz_convert('US/Eastern')
+    # Extract date from datetime
+    df['Date'] = df['Datetime_EST'].dt.date
+    # Get start and end dates for title
+    start_date = df['Date'].min()
+    end_date = df['Date'].max()
+    logging.info(f"Data covers from {start_date} to {end_date}")
+    # ---- Plotting ----
+    fig, ax = plt.subplots()
+    fig.suptitle("FAANG Stock Reports", fontsize=16)
+    # Define tickers globally or pass as parameter
+    if df is None or png_file_name is None:
         logging.error("DataFrame or PNG file path is None.")
-        return_code = -1
-        return_message = "DataFrame or PNG file path is None."
-        return return_code, return_message, None
-    plt.figure(figsize=(14, 8))
+        return
+    #print(date_list)
+    fig.set_size_inches(14, 8)
     for ticker in tickers:
-        plt.plot(df.index, df[(ticker, 'Close')], label=ticker)
-    plt.xlabel('Date')
-    plt.ylabel('Close Price')
-    plt.title('Stock Prices Over Time')
-    plt.legend()
-    plt.grid(True)
+        ax.plot(df['Datetime_EST'], df[(ticker, 'Close')], label=ticker, linestyle='-', marker='o')
+
+
+    # set date ticks to 90-degree rotation for readability
+    # plt.xticks(rotation=90) # Removed - Handled by autofmt_xdate
+    ax.grid(True, which='both', linestyle='--', linewidth=0.5) # Updated grid
+    ax.set_xlabel(' Trading Date and Time ', fontsize=12)
+    ax.set_ylabel('Close Price in $', fontsize=12)
+    ax.set_title(f'FAANG Stock Closing Price  From {start_date} to {end_date}', fontsize=14)
+    leg = ax.legend(loc='upper left', fontsize=10, bbox_to_anchor=(1, 1), borderaxespad=0.)
+    leg.get_title().set_fontsize(11)
+    leg.set_title('Tickers')
+    
+    # Split date time into major and minor ticks
+    
+    ax.xaxis.set_major_locator(mdates.DayLocator(interval=1))
+    ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
+
+    # Minor Ticks: Hours (HHh)
+    # Show hours 0, 6, 12, 18. Adjust 'byhour' as needed.
+    ax.xaxis.set_minor_locator(mdates.HourLocator(byhour=[0, 6, 12, 18]))
+    ax.xaxis.set_minor_formatter(mdates.DateFormatter('%Hh'))
+    
+    # Rotate major labels for readability
+    fig.autofmt_xdate(which='major', rotation=90)
+    fig.autofmt_xdate(which='minor', rotation=90)
+    
+    # Style minor labels (small and rotated)
+    #plt.setp(ax.xaxis.get_minorticklabels(), rotation=90, size=8)
+    # --- End Tick Formatting ---
+    
+    # ax.xaxis.set_major_formatter(date_formatter) # Removed
     plt.tight_layout()
-    # Save the plot to a PNG file
-    try:
-        os.makedirs(os.path.dirname(png_file_path), exist_ok=True)
-    except Exception as e:
-        logging.error(f"Error creating directories for {png_file_path}: {e}")
-        return_code = -1
-        return_message = f"Error creating directories for {png_file_path}: {e}"
-        return return_code, return_message, None
-    logging.info(f"Saving plot to {png_file_path}")
-    try:
-        plt.savefig(png_file_path)
-    except Exception as e:
-        logging.error(f"Error saving plot to {png_file_path}: {e}")
-        return_code = -1
-        return_message = f"Error saving plot to {png_file_path}: {e}"
-        return return_code, return_message, None
-    plt.close()
-    return return_code, return_message, png_file_path
+    plt.savefig(png_file_name)
+    if show_plot:
+        plt.show()
+
+    logging.info(f"Plot saved to {png_file_name}")
+    plt.close(fig)
+    return return_code, return_message, png_file_name
 #------------------------------------------------------------------------------
 # Main function to parse arguments and call other functions
 #------------------------------------------------------------------------------
@@ -313,28 +377,12 @@ def main():
     
     logging.info("Extract Complete")
     logging.info("Starting to Load File")
-    #==============================================================================
-    # LOAD
-    #==============================================================================
-    return_code, return_message, latest_file = get_latest_file(data_path=data_path)
+    
+    return_code, return_message, png_file_path = plot_data()
     if return_code != 0:
-        logging.error(f"Failed to get latest file: { return_message , return_code}")
-        exit(2)
-    return_code, return_message, df_loaded = load_file_into_dataframe(latest_file)
-    if return_code != 0:
-        logging.error(f"Failed to load file into dataframe: { return_message , return_code}")
-        exit(3)
-    logging.info("Load File Complete")
-    logging.info("Starting to Generate Report")
-    #================================================================================
-    # TRANSFORM and REPORT
-    #================================================================================
-    # convert latest_file to png file name
-    if latest_file is None:
-        logging.error("No latest file found. Cannot generate report.")
-        exit(4)
-    png_file_path = latest_file.replace('.csv', '.png')
-    return_code, return_message, png_file_path = plot_data(df_loaded, png_file_path)
+        logging.error(f"Plotting failed: { return_message , return_code}")
+        exit(1)
+    logging.info(f"Plotting complete. Plot saved to {png_file_path}")
     logging.info("Report Complete")
     logging.info("Complete Main")
 
