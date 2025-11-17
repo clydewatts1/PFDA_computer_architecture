@@ -366,7 +366,7 @@ def main():
     logging.info(f"report_name={report_name}")
     logging.info("Starting to Extract Data from Source yfinance")
     #==============================================================================
-    # EXTRACT 
+    # EXTRACT (1)
     #==============================================================================
     return_code, return_message, file_name = get_data(tickers, start_date=start_date, end_date=end_date, interval=interval, data_path=data_path)
     if return_code != 0:
@@ -377,7 +377,9 @@ def main():
     
     logging.info("Extract Complete")
     logging.info("Starting to Load File")
-    
+    #==============================================================================
+    # PLOT (1)
+    #==============================================================================
     return_code, return_message, png_file_path = plot_data()
     if return_code != 0:
         logging.error(f"Plotting failed: { return_message , return_code}")
