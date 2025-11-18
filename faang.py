@@ -34,7 +34,8 @@ import yfinance as yf
 
 # prototype for extracting stock data
 tickers = ["META", "AAPL", "AMZN", "NFLX", "GOOG"]
-def get_data(tickers = tickers,start_date=None, end_date=None,interval="1h",data_path="./data/"):
+
+def get_data(tickers = tickers,start_date=None, end_date=None,interval="1h",data_path="./data/",once_only=True):
     """
     Function to get stock data from yfinance
 
@@ -44,6 +45,9 @@ def get_data(tickers = tickers,start_date=None, end_date=None,interval="1h",data
     end_date (str): End date for data in format "YYYY-MM-DD". If None, defaults to yesterday.
     interval (str): Data interval. Default is "1h".
     data_path (str): Path to save the data. Default is "./data/".
+    once_only (bool): If True, download data only once for a date and do not overwrite existing files. Default is True.
+    If set to false it will delete existing files and download again.
+    TODO: add only once functionality
     Returns:
        return_code : 0 for success, -1 for failure
        return_message : message indicating success or failure
@@ -52,17 +56,25 @@ def get_data(tickers = tickers,start_date=None, end_date=None,interval="1h",data
     return_code = 0
     return_message = "Success"
     file_name = None
-    if start_date is None:
-        # Variation of the fence posting to get last 7 days of data
-        start_date = (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d")
-        # create file name based on current date and time
-        file_name = f"{data_path}{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
-    else:
-        # convert start_date to datetime object
-        start_date_time = datetime.strptime(start_date, "%Y-%m-%d")
-        # create file name based on start time and 23:59:59 of end date
-        start_date_str = start_date_time.strftime("%Y%m%d") + "_235959"
-        file_name = f"{data_path}{start_date_str}.csv"
+    # TODO : implement once_only functionality
+    # TODO : Sort out logic of start_date and end_date for once only check , simplify
+    # Get current date and time and keep it constant
+    now_dttm = datetime.now()
+    # if start_date is None , set to today - 7 days
+    start_date_dttm =(now_dttm - timedelta(days=7)) if start_date is None else datetime.strptime(start_date, "%Y-%m-%d")
+    start_date = start_date_dttm.strftime("%Y-%m-%d") if start_date is None else start_date
+    start_date_dttm = datetime.strptime(start_date, "%Y-%m-%d")
+    # create file name from start date
+    file_name = f"{data_path}{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+    # create string for glob to check if file exists for start date
+    start_date_glob_str = f"{data_path}{datetime.now().strftime('%Y%m%d')}*.csv"
+    if once_only and glob.glob(start_date_glob_str):
+        logging.info(f"File already exists for start date {start_date}, skipping download.")
+        existing_files = glob.glob(start_date_glob_str)
+        file_name = existing_files[0]  # Get the first matching file
+        return return_code, return_message, file_name
+
+        
     # if end_date is None , set to today - 0 days this means yesterday's data inclusive
     if end_date is None:
         end_date = (datetime.now() - timedelta(days=0)).strftime("%Y-%m-%d")
@@ -80,6 +92,8 @@ def get_data(tickers = tickers,start_date=None, end_date=None,interval="1h",data
             return_code = -1
             return_message = f"Error creating directory: {e}"
             return return_code, return_message, None
+    # get start date only string for file name for once only check
+
     # if file exists then delete it
     if os.path.exists(file_name):
         logging.info(f"Deleting existing file: {file_name}")
@@ -103,7 +117,9 @@ def get_data(tickers = tickers,start_date=None, end_date=None,interval="1h",data
     return return_code, return_message, file_name
    
 
-  #------------------------------------------------------------------------------
+   
+
+#------------------------------------------------------------------------------
 # Function to get the latest file from a directory
 #------------------------------------------------------------------------------
 
@@ -170,6 +186,9 @@ def get_PNG_filename_from_CSV_filename(csv_filename,plot_path="./plots/"):
     # create png filename
     png_filename = f"{plot_path}{base_name}.png"
     return return_code, return_message, png_filename
+#------------------------------------------------------------------------------
+# Function to load file into dataframe
+#------------------------------------------------------------------------------
 def load_file_into_dataframe(file):
     """load_file_into_dataframe
 
@@ -211,13 +230,16 @@ def load_file_into_dataframe(file):
         return return_code, return_message, None
     
     return return_code, return_message, df
-
-def plot_data(show_plot=False):
+#------------------------------------------------------------------------------
+# Function to plot data
+#------------------------------------------------------------------------------
+def plot_data(show_plot=False,bpi=300):
     """plot_data
 
     Args:
         df (pd.DataFrame): The data as a pandas DataFrame.
         png_file_path (str): The path to save the plot image.
+        bpi (int): The resolution (bits per inch) for the saved plot image.
 
     Returns:
         None
@@ -245,7 +267,7 @@ def plot_data(show_plot=False):
     return_code, return_message, png_file_name = get_PNG_filename_from_CSV_filename(png_file_name, "./plots/")
     if return_code != 0:
         logging.error(f"PNG file path retrieval failed - Return Code: {return_code}, Message: {return_message}, File: {png_file_path}")
-        return return_code, return_message, png_file_path
+        return return_code, return_message, png_file_name
     # Create plots directory if it doesn't exist
     # extract path from png_file_name
     png_path = Path.Path(png_file_name).parent 
@@ -271,7 +293,6 @@ def plot_data(show_plot=False):
     if df is None or png_file_name is None:
         logging.error("DataFrame or PNG file path is None.")
         return
-    #print(date_list)
     fig.set_size_inches(14, 8)
     for ticker in tickers:
         ax.plot(df['Datetime_EST'], df[(ticker, 'Close')], label=ticker, linestyle='-', marker='o')
@@ -301,13 +322,9 @@ def plot_data(show_plot=False):
     fig.autofmt_xdate(which='major', rotation=90)
     fig.autofmt_xdate(which='minor', rotation=90)
     
-    # Style minor labels (small and rotated)
-    #plt.setp(ax.xaxis.get_minorticklabels(), rotation=90, size=8)
-    # --- End Tick Formatting ---
-    
-    # ax.xaxis.set_major_formatter(date_formatter) # Removed
+
     plt.tight_layout()
-    plt.savefig(png_file_name)
+    plt.savefig(png_file_name, dpi=bpi)
     if show_plot:
         plt.show()
 
