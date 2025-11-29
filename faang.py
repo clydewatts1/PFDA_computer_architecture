@@ -35,7 +35,8 @@ import yfinance as yf
 # prototype for extracting stock data
 tickers = ["META", "AAPL", "AMZN", "NFLX", "GOOG"]
 
-def get_data(tickers = tickers,start_date=None, end_date=None,interval="1h",data_path="./data/",once_only=True):
+
+def get_data(tickers = tickers,start_date=None, end_date=None,interval="1h",data_path="./data/",once_only=True)-> tuple[int, str, str, pd.DataFrame]:
     """
     Function to get stock data from yfinance
 
@@ -56,6 +57,7 @@ def get_data(tickers = tickers,start_date=None, end_date=None,interval="1h",data
     return_code = 0
     return_message = "Success"
     file_name = None
+    df_data = None
     # TODO : implement once_only functionality
     # TODO : Sort out logic of start_date and end_date for once only check , simplify
     # Get current date and time and keep it constant
@@ -72,7 +74,7 @@ def get_data(tickers = tickers,start_date=None, end_date=None,interval="1h",data
         logging.info(f"File already exists for start date {start_date}, skipping download.")
         existing_files = glob.glob(start_date_glob_str)
         file_name = existing_files[0]  # Get the first matching file
-        return return_code, return_message, file_name
+        return return_code, return_message, file_name, None
 
         
     # if end_date is None , set to today - 0 days this means yesterday's data inclusive
@@ -91,7 +93,7 @@ def get_data(tickers = tickers,start_date=None, end_date=None,interval="1h",data
             logging.error(f"Error creating directory: {e}")
             return_code = -1
             return_message = f"Error creating directory: {e}"
-            return return_code, return_message, None
+            return return_code, return_message, None, None
     # get start date only string for file name for once only check
 
     # if file exists then delete it
@@ -103,7 +105,7 @@ def get_data(tickers = tickers,start_date=None, end_date=None,interval="1h",data
             logging.error(f"Error deleting file: {e}")
             return_code = -1
             return_message = f"Error deleting file: {e}"
-            return return_code, return_message, None
+            return return_code, return_message, None, None
     logging.info(f"Start Date: {start_date}, End Date: {end_date}")
     try:
         df_data = yf.download(tickers, interval=interval, group_by='ticker',start=start_date, end=end_date)
@@ -111,11 +113,13 @@ def get_data(tickers = tickers,start_date=None, end_date=None,interval="1h",data
         logging.error(f"Error downloading data: {e}")
         return_code = -1
         return_message = f"Error downloading data: {e}"
-        return return_code, return_message, None
+        return return_code, return_message, None, None
     # Save the data to a CSV file
     df_data.to_csv(file_name)
-    return return_code, return_message, file_name
+    return return_code, return_message, file_name,df_data
    
+
+
 
    
 
@@ -123,7 +127,7 @@ def get_data(tickers = tickers,start_date=None, end_date=None,interval="1h",data
 # Function to get the latest file from a directory
 #------------------------------------------------------------------------------
 
-def get_latest_file(data_path="./data/"):
+def get_latest_file(data_path="./data/")-> tuple[int, str, str]:
     """
     Returns the path to the latest data file in the specified directory.
 
@@ -163,10 +167,11 @@ def get_latest_file(data_path="./data/"):
     latest_file = max(list_of_files, key=os.path.getctime)
     logging.info(f"Latest file: {latest_file}")
     return return_code, return_message, latest_file
+
 #-------------------------------------------------------------------------------
 # Function to get PNG filename from CSV filename
 #-------------------------------------------------------------------------------
-def get_PNG_filename_from_CSV_filename(csv_filename,plot_path="./plots/"):
+def get_PNG_filename_from_CSV_filename(csv_filename,plot_path="./plots/")-> tuple[int, str, str]:
     """
     Function to get PNG filename from CSV filename
 
@@ -189,7 +194,7 @@ def get_PNG_filename_from_CSV_filename(csv_filename,plot_path="./plots/"):
 #------------------------------------------------------------------------------
 # Function to load file into dataframe
 #------------------------------------------------------------------------------
-def load_file_into_dataframe(file):
+def load_file_into_dataframe(file)-> tuple[int, str, pd.DataFrame]:
     """load_file_into_dataframe
 
     Args:
@@ -230,10 +235,12 @@ def load_file_into_dataframe(file):
         return return_code, return_message, None
     
     return return_code, return_message, df
+
+
 #------------------------------------------------------------------------------
 # Function to plot data
 #------------------------------------------------------------------------------
-def plot_data(show_plot=False,bpi=300):
+def plot_data(show_plot=False,bpi=300)-> tuple[int, str, str]:
     """plot_data
 
     Args:
@@ -290,9 +297,10 @@ def plot_data(show_plot=False,bpi=300):
     fig, ax = plt.subplots()
     fig.suptitle("FAANG Stock Reports", fontsize=16)
     # Define tickers globally or pass as parameter
-    if df is None or png_file_name is None:
+    if df is None or png_path is None:
         logging.error("DataFrame or PNG file path is None.")
         return
+    #print(date_list)
     fig.set_size_inches(14, 8)
     for ticker in tickers:
         ax.plot(df['Datetime_EST'], df[(ticker, 'Close')], label=ticker, linestyle='-', marker='o')
@@ -385,7 +393,7 @@ def main():
     #==============================================================================
     # EXTRACT (1)
     #==============================================================================
-    return_code, return_message, file_name = get_data(tickers, start_date=start_date, end_date=end_date, interval=interval, data_path=data_path)
+    return_code, return_message, file_name , df_data = get_data(tickers, start_date=start_date, end_date=end_date, interval=interval, data_path=data_path)
     if return_code != 0:
         logging.error(f"Data extraction failed: { return_message , return_code}")
         exit(1)
