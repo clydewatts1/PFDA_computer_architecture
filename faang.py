@@ -108,7 +108,7 @@ def get_data(tickers = tickers,start_date=None, end_date=None,interval="1h",data
             return return_code, return_message, None, None
     logging.info(f"Start Date: {start_date}, End Date: {end_date}")
     try:
-        df_data = yf.download(tickers, interval=interval, group_by='ticker',start=start_date, end=end_date)
+        df_data = yf.download(tickers, interval=interval, group_by='ticker',start=start_date, end=end_date,auto_adjust=True)
     except Exception as e:
         logging.error(f"Error downloading data: {e}")
         return_code = -1
