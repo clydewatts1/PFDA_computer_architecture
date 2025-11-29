@@ -372,6 +372,10 @@ def main():
     log_path = args.log_path
     report_name = args.report_name
     png_file_path = None
+    " check if log_path exists , if not create it"
+    if not os.path.exists(log_path):
+        os.makedirs(log_path)
+        print(f"Created log directory: {log_path}")
     # setup logging , default to INFO
     # the default will be to logs directory with the file name faang_YYYYMMDD_HHMMSS.log and to console
     log_file = os.path.join(log_path, f"faang_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log")
