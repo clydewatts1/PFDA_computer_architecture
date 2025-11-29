@@ -1,0 +1,52 @@
+# This workflow will install Python dependencies and run the FAANG stock analysis script
+# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-python
+
+name: FAANG Stock Analysis
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  schedule:
+    # Run daily at 9 PM UTC (after US markets close)
+    - cron: '0 21 * * 1-5'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python 3.12
+      uses: actions/setup-python@v3
+      with:
+        python-version: "3.12"
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+    
+    - name: Run FAANG Stock Analysis
+      run: |
+        python faang.py
+    
+    - name: Upload generated plots
+      uses: actions/upload-artifact@v3
+      with:
+        name: stock-plots
+        path: plots/*.png
+        if-no-files-found: warn
+    
+    - name: Upload generated data
+      uses: actions/upload-artifact@v3
+      with:
+        name: stock-data
+        path: data/*.csv
+        if-no-files-found: warn
