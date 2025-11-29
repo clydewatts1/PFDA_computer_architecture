@@ -38,14 +38,14 @@ jobs:
         python faang.py
     
     - name: Upload generated plots
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: stock-plots
         path: plots/*.png
         if-no-files-found: warn
     
     - name: Upload generated data
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: stock-data
         path: data/*.csv
