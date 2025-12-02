@@ -36,6 +36,9 @@ jobs:
     - name: Run FAANG Stock Analysis
       run: |
         python faang.py
+
+    - name: Pull latest changes before push
+      run: git pull --rebase origin main
     
     - name: Commit and push changes
       run: |
