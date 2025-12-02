@@ -11,6 +11,16 @@ on:
   schedule:
     # Run daily at 9 PM UTC (after US markets close)
     - cron: '0 21 * * 1-5'
+  workflow_dispatch:
+    inputs:
+      runMode:
+        description: "Run mode"
+        type: choice
+        options:
+          - default
+          - full-refresh
+        default: default
+        required: true
 
 permissions:
   contents: write
@@ -36,6 +46,7 @@ jobs:
     - name: Run FAANG Stock Analysis
       run: |
         python faang.py
+        # Optionally use ${{ github.event.inputs.runMode }} inside your script if needed
 
     - name: Pull latest changes before push
       run: git pull --rebase origin main
