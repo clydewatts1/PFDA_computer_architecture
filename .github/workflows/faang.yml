@@ -10,7 +10,7 @@ on:
     branches: [ "main" ]
   schedule:
     # Run daily at 9 PM UTC (after US markets close)
-    - cron: '0 21 * * 1-5'
+    - cron: '13 21 * * 6'
   workflow_dispatch:
     inputs:
       runMode:
